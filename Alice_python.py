@@ -8,20 +8,16 @@ def contar_caracteres(arquivo):
     pmf = {}
     
     # Ler o arquivo e contar caracteres
-    with open(arquivo, 'r', encoding='Unicode') as f:
+    with open(arquivo, 'r', encoding='utf-8') as f:
         texto = f.read()
-        total_chars = 0
+        total_chars = len(texto)
         
         for char in texto:
-            if char in contador:
-                contador[char] += 1
-            else:
-                contador[char] = 1
-            total_chars += 1
+            contador[char] = contador.get(char, 0) + 1
     
     # Calcular PMF (Função Massa de Probabilidade)
-    for char in contador:
-        pmf[char] = contador[char] / total_chars
+    for char, freq in contador.items():
+        pmf[char] = freq / total_chars
     
     return contador, pmf, texto
 
@@ -41,18 +37,26 @@ def contar_bytes(arquivo):
     except Exception as e:
         return f"Erro ao ler arquivo: {str(e)}"
 
-def comprimir_arquivo(texto, huffman, caracteres_ordenados, arquivo_saida):
-    # Criar dicionário de códigos
-    codigos = {}
-    for i, char in enumerate(caracteres_ordenados):
-        code = huffman.encode([i])
-        codigos[char] = ''.join(map(str, code))
+def criar_codigo_huffman(pmf):
+    """Cria os códigos de Huffman corretamente associando caracteres aos códigos binários"""
+    sorted_pmf = sorted(pmf.items(), key=lambda x: x[1], reverse=True)
+    caracteres_ordenados = [char for char, _ in sorted_pmf]
+    probs = [prob for _, prob in sorted_pmf]
+
+    huffman = komm.HuffmanCode(probs)
+
+    # Gerar os códigos corretamente
+    codigos = {caracteres_ordenados[i]: ''.join(map(str, huffman.encode([i]))) for i in range(len(caracteres_ordenados))}
     
+    return huffman, codigos, caracteres_ordenados
+
+def comprimir_arquivo(texto, codigos, caracteres_ordenados, arquivo_saida):
+    """Codifica o texto e salva como arquivo binário"""
     # Codificar o texto
     texto_codificado = ''.join(codigos[char] for char in texto)
     
     # Adicionar padding
-    padding = 8 - (len(texto_codificado) % 8)  # Corrigido aqui
+    padding = 8 - (len(texto_codificado) % 8)
     if padding != 8:
         texto_codificado += '0' * padding
     
@@ -64,36 +68,31 @@ def comprimir_arquivo(texto, huffman, caracteres_ordenados, arquivo_saida):
     
     # Salvar arquivo comprimido
     with open(arquivo_saida, 'wb') as f:
-        # Escrever padding
-        f.write(bytes([padding]))
+        f.write(bytes([padding]))  # Escrever padding
+        f.write(struct.pack('I', len(caracteres_ordenados)))  # Escrever número de caracteres
         
-        # Escrever número de caracteres
-        f.write(struct.pack('I', len(caracteres_ordenados)))
-        
-        # Escrever caracteres e seus tamanhos
+        # Escrever caracteres
         for char in caracteres_ordenados:
-            char_bytes = char.encode('Unicode')
+            char_bytes = char.encode('utf-8')
             f.write(struct.pack('B', len(char_bytes)))  # Tamanho do caractere em bytes
             f.write(char_bytes)  # O caractere em si
         
         # Escrever dados comprimidos
         f.write(bytes_array)
     
-    return len(bytes_array) + 5 + sum(len(char.encode('Unicode')) + 1 for char in caracteres_ordenados)
+    return len(bytes_array) + 5 + sum(len(char.encode('utf-8')) + 1 for char in caracteres_ordenados)
 
-def descomprimir_arquivo(arquivo_entrada, arquivo_saida, huffman, caracteres_ordenados):
+def descomprimir_arquivo(arquivo_entrada, arquivo_saida, codigos, caracteres_ordenados):
+    """Lê o arquivo binário e reconstrói o texto original"""
     with open(arquivo_entrada, 'rb') as f:
-        # Ler padding
-        padding = int.from_bytes(f.read(1), byteorder='big')
-        
-        # Ler número de caracteres
-        num_chars = struct.unpack('I', f.read(4))[0]
+        padding = int.from_bytes(f.read(1), byteorder='big')  # Ler padding
+        num_chars = struct.unpack('I', f.read(4))[0]  # Ler número de caracteres
         
         # Ler caracteres
         chars = []
         for _ in range(num_chars):
-            char_size = struct.unpack('B', f.read(1))[0]  # Ler tamanho do caractere
-            char = f.read(char_size).decode('Unicode')  # Ler e decodificar o caractere
+            char_size = struct.unpack('B', f.read(1))[0]  # Tamanho do caractere
+            char = f.read(char_size).decode('utf-8')  # Caractere real
             chars.append(char)
         
         # Ler dados comprimidos
@@ -101,27 +100,26 @@ def descomprimir_arquivo(arquivo_entrada, arquivo_saida, huffman, caracteres_ord
     
     # Converter para bits
     bits = ''.join(format(byte, '08b') for byte in dados_comprimidos)
+    
+    # Remover padding apenas se ele foi realmente adicionado
     if padding != 8:
         bits = bits[:-padding]
     
     # Criar dicionário reverso de códigos
-    codigos_reversos = {}
-    for i, char in enumerate(caracteres_ordenados):
-        code = huffman.encode([i])
-        codigos_reversos[''.join(map(str, code))] = char
+    codigos_reversos = {v: k for k, v in codigos.items()}
     
     # Decodificar
     codigo_atual = ''
-    texto_decodificado = ''
+    texto_decodificado = []
     for bit in bits:
         codigo_atual += bit
         if codigo_atual in codigos_reversos:
-            texto_decodificado += codigos_reversos[codigo_atual]
+            texto_decodificado.append(codigos_reversos[codigo_atual])
             codigo_atual = ''
     
     # Salvar arquivo descomprimido
-    with open(arquivo_saida, 'w', encoding='Unicode') as f:
-        f.write(texto_decodificado)
+    with open(arquivo_saida, 'w', encoding='utf-8') as f:
+        f.write(''.join(texto_decodificado))
 
 # Arquivo de entrada
 arquivo = 'alice.txt'
@@ -129,27 +127,22 @@ arquivo = 'alice.txt'
 # Contar caracteres e obter texto
 contador, pmf, texto_original = contar_caracteres(arquivo)
 
-# Ordenar PMF e caracteres
-sorted_pmf = sorted(pmf.items(), key=lambda x: x[1], reverse=True)
-caracteres_ordenados = [char for char, _ in sorted_pmf]
-probs = [prob for _, prob in sorted_pmf]
-
 # Criar código de Huffman
-huffman = komm.HuffmanCode(probs)
+huffman, codigos, caracteres_ordenados = criar_codigo_huffman(pmf)
 
 # Exibir estatísticas iniciais
 print("\nEstatísticas iniciais:")
-dms = komm.DiscreteMemorylessSource(probs)
+dms = komm.DiscreteMemorylessSource(list(pmf.values()))
 print(f"Entropia da distribuição: {dms.entropy():.4f} bits/símbolo")
-print(f"Comprimento médio do código: {huffman.rate(probs):.4f} bits/símbolo")
+print(f"Comprimento médio do código: {huffman.rate(list(pmf.values())):.4f} bits/símbolo")
 
 # Comprimir arquivo
 arquivo_comprimido = 'alice.bin'
-tamanho_comprimido = comprimir_arquivo(texto_original, huffman, caracteres_ordenados, arquivo_comprimido)
+tamanho_comprimido = comprimir_arquivo(texto_original, codigos, caracteres_ordenados, arquivo_comprimido)
 
 # Descomprimir arquivo
 arquivo_descomprimido = 'alice_descomprimido.txt'
-descomprimir_arquivo(arquivo_comprimido, arquivo_descomprimido, huffman, caracteres_ordenados)
+descomprimir_arquivo(arquivo_comprimido, arquivo_descomprimido, codigos, caracteres_ordenados)
 
 # Calcular e exibir estatísticas finais
 tamanho_original = contar_bytes(arquivo)['bytes']
