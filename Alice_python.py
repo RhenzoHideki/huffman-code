@@ -8,14 +8,14 @@ def contar_caracteres(arquivo):
     pmf = {}
     
     # Ler o arquivo e contar caracteres
-    with open(arquivo, 'r', encoding='utf-8') as f:
-        texto = f.read()
+    with open(arquivo, 'rb') as f:  # Mudado para 'rb'
+        texto = f.read().decode('utf-8')  # Decodifica após ler os bytes
         total_chars = len(texto)
         
         for char in texto:
             contador[char] = contador.get(char, 0) + 1
     
-    # Calcular PMF (Função Massa de Probabilidade)
+    # Calcular PMF
     for char, freq in contador.items():
         pmf[char] = freq / total_chars
     
@@ -50,6 +50,7 @@ def criar_codigo_huffman(pmf):
     
     return huffman, codigos, caracteres_ordenados
 
+
 def comprimir_arquivo(texto, codigos, caracteres_ordenados, arquivo_saida):
     """Codifica o texto e salva como arquivo binário"""
     # Codificar o texto
@@ -68,14 +69,15 @@ def comprimir_arquivo(texto, codigos, caracteres_ordenados, arquivo_saida):
     
     # Salvar arquivo comprimido
     with open(arquivo_saida, 'wb') as f:
-        f.write(bytes([padding]))  # Escrever padding
-        f.write(struct.pack('I', len(caracteres_ordenados)))  # Escrever número de caracteres
+        # Escrever cabeçalho
+        f.write(bytes([padding]))
+        f.write(struct.pack('I', len(caracteres_ordenados)))
         
-        # Escrever caracteres
+        # Escrever tabela de caracteres
         for char in caracteres_ordenados:
             char_bytes = char.encode('utf-8')
-            f.write(struct.pack('B', len(char_bytes)))  # Tamanho do caractere em bytes
-            f.write(char_bytes)  # O caractere em si
+            f.write(struct.pack('B', len(char_bytes)))
+            f.write(char_bytes)
         
         # Escrever dados comprimidos
         f.write(bytes_array)
@@ -85,14 +87,15 @@ def comprimir_arquivo(texto, codigos, caracteres_ordenados, arquivo_saida):
 def descomprimir_arquivo(arquivo_entrada, arquivo_saida, codigos, caracteres_ordenados):
     """Lê o arquivo binário e reconstrói o texto original"""
     with open(arquivo_entrada, 'rb') as f:
-        padding = int.from_bytes(f.read(1), byteorder='big')  # Ler padding
-        num_chars = struct.unpack('I', f.read(4))[0]  # Ler número de caracteres
+        # Ler cabeçalho
+        padding = int.from_bytes(f.read(1), byteorder='big')
+        num_chars = struct.unpack('I', f.read(4))[0]
         
-        # Ler caracteres
+        # Ler tabela de caracteres
         chars = []
         for _ in range(num_chars):
-            char_size = struct.unpack('B', f.read(1))[0]  # Tamanho do caractere
-            char = f.read(char_size).decode('utf-8')  # Caractere real
+            char_size = struct.unpack('B', f.read(1))[0]
+            char = f.read(char_size).decode('utf-8')
             chars.append(char)
         
         # Ler dados comprimidos
@@ -100,17 +103,14 @@ def descomprimir_arquivo(arquivo_entrada, arquivo_saida, codigos, caracteres_ord
     
     # Converter para bits
     bits = ''.join(format(byte, '08b') for byte in dados_comprimidos)
-    
-    # Remover padding apenas se ele foi realmente adicionado
     if padding != 8:
         bits = bits[:-padding]
     
-    # Criar dicionário reverso de códigos
-    codigos_reversos = {v: k for k, v in codigos.items()}
-    
     # Decodificar
+    codigos_reversos = {v: k for k, v in codigos.items()}
     codigo_atual = ''
     texto_decodificado = []
+    
     for bit in bits:
         codigo_atual += bit
         if codigo_atual in codigos_reversos:
@@ -120,7 +120,7 @@ def descomprimir_arquivo(arquivo_entrada, arquivo_saida, codigos, caracteres_ord
     # Salvar arquivo descomprimido
     with open(arquivo_saida, 'w', encoding='utf-8') as f:
         f.write(''.join(texto_decodificado))
-
+        
 # Arquivo de entrada
 arquivo = 'alice.txt'
 
