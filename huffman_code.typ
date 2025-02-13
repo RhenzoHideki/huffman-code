@@ -9,6 +9,8 @@
 )
 
 = Introdução
+Este relatório tem como objetivo explorar a aplicação dos códigos de Huffman na compressão de dados, abordando tanto os aspectos teóricos quanto práticos. Serão apresentados cálculos de entropia, construção de códigos de Huffman e a implementação de um programa para compressão e descompressão de arquivos de texto. O estudo é dividido em duas questões principais: a primeira trata da teoria por trás dos códigos de Huffman, enquanto a segunda aborda a implementação prática de um compressor de arquivos.
+
 
 #pagebreak()
 = Desenvolvimento
@@ -27,7 +29,7 @@ $
 
 Logo para está fonte podemos:
 $
-H(X) = 3/10 dot log_2(3/10) + 6/10 dot log_2(6/10) + 1/10 dot log_2(1/10)
+H(X) =-( 3/10 dot log_2(3/10) + 6/10 dot log_2(6/10) + 1/10 dot log_2(1/10))
 $
 
 $
@@ -52,12 +54,14 @@ Para fazer o código Huffman e o comprimento iremos fazer primeiro o diagrama:
 #figure(
   image("./Figures/DiagramaHuffman.jpg",width:100%),
   caption: [
+    Diagrama de Huffman para a fonte.
+
    Fonte: Elaborada pelo autor
   ],
   supplement: "Figura"
 );
-A partir desse diagrama é possivel achar que :
-dado por $𝒳 = {𝑎, 𝑏, 𝑐}$ temos  $[10, 0, 11]$
+A partir desse diagrama é possivel concluir :
+$ 𝒳 = {𝑎, 𝑏, 𝑐} arrow [10, 0, 11] $
 
 Agora para calcular o comprimento temos :
 $
@@ -75,9 +79,13 @@ print(huffman_code.codewords , huffman_code.rate(px))
 Para extender o código para a segunda ordem, é seguida da seguinte forma :
 $
   X^2 = {"aa","ab","ac","bb","ba","bc","cc","ca","cb"}
+\ "Com probabilidade:"
 \ P_x ^2 = {"0.09","0.18","0.03","0.36","0.18","0.06","0.01","0.03","0.06"}
+\ "A entropia da extensão de seunda orderm é calculada da seguinte forma:"
 \ H(X^2 ) = 0.09 dot log_2(0.09) + 0.18 dot log_2(0.18) + 0.03 dot log_2(0.03) \ + 0.36 dot log_2(0.36) + 0.18 dot log_2(0.18) + 0.06 dot log_2(0.06) \ + 0.01 dot log_2(0.01) + 0.03 dot log_2(0.03) + 0.06 dot log_2(0.06)
 \ H(X^2) = 2.59 "bits/superpalavras"
+\ "Ou desta forma:"
+\ H(X^2) = 2 * H(X) = 2 * 1,295 = 2,59 "bits/superpalavra"
 $
 
 Código para validar:
@@ -92,6 +100,7 @@ print(f"Entropia da extensão de segunda ordem (H(X^2)): {H_X2:.4f} bits")
 ```
 #pagebreak()
 == Determinando a extensão de segunda ordem e comprimento médio
+O diagrama abaixo ilustra o processo de construção do código de Huffman para a extensão de segunda ordem:
 #figure(
   image("./Figures/DiagramaHuffman-Página-2.jpg",width:100%),
   caption: [
@@ -102,18 +111,18 @@ print(f"Entropia da extensão de segunda ordem (H(X^2)): {H_X2:.4f} bits")
 
 $
    X^2 = {"aa","ab","ac","bb","ba","bc","cc","ca","cb"}
-  \ "Temos na sequência as palavras"
+  \ "Temos na sequência as palavras?"
   \ {0100,11,010100,10,00,0111,01011,0110,010101}
   
 $
-Para o comprimento médio temos:
+O código a seguir valida o código de Huffman e o comprimento médio:
 $
 \ {"aa","ab","ac","bb","ba","bc","cc","ca","cb"}
 \  {"0.09","0.18","0.03","0.36","0.18","0.06","0.01","0.03","0.06"}
 \  {0100,    11, 010100,   00,   10,    0111, 010101,01011,0110 }
 \  {4,2,6,2,2,4,5,4,6}
 \ l = 0.09*4 + 0.18*2 + 0.03*6  +0.36*2 + 0.18*2 + 0.06*4 + 0.01*6+0.03*5+0.06*4
-\ l = 2.67
+\ l = 2.67 "bits/superpalavra"
 $
 #pagebreak()
 Código para validar:
@@ -182,85 +191,40 @@ Compare com a tabela a seguir, que mostra o tamanho do arquivo original e dos ar
 
 #pagebreak()
 == Entropia da distribuição e Comprimento médio
-Para fazer o calculo de entropia é necessário fazer a abertura e leitura do arquivo e armazenar a quantia de caracteres.
-sendo assim foi criado uma função para fazer a contagem dos characteres, gerar e gerar a pmf
+A entropia da distribuição de frequências dos caracteres do livro foi calculada:
+$ H(X) = 4.62 "bits" $
+O comprimento médio do código de Huffman obtido foi:
+$ l = 4.66 "bits/caractere" $
+O código a seguir valida esses cálculos
 ```py
-
-def contar_caracteres(arquivo):
-    contador = {}
-    pmf = {}
-    
-    # Ler o arquivo e contar caracteres
-    with open(arquivo, 'rb') as f:  # Mudado para 'rb'
-        texto = f.read().decode('utf-8')  # Decodifica após ler os bytes
-        total_chars = len(texto)
-        
-        for char in texto:
-            contador[char] = contador.get(char, 0) + 1
-    
-    # Calcular PMF
-    for char, freq in contador.items():
-        pmf[char] = freq / total_chars
-    
-    return contador, pmf, texto
-```
-```py
-arquivo = 'alice.txt'
-
-# Contar caracteres e obter texto
-contador, pmf, texto_original = contar_caracteres(arquivo)
-
-
-# Exibir contagem de caracteres em ordem decrescente
-print("Contagem de caracteres:")
-# Ordenar por quantidade (valor) em ordem decrescente
-for char, quantidade in sorted(contador.items(), key=lambda x: x[1], reverse=True):
-    print(f'{char}: {quantidade}')
-```
-Esta primeira parte apenas mostra os characteres e a sua respectiva quantidade no livro.
-```Bash
-Contagem de caracteres:
- : 24633
-e: 13552
-t: 10345
-a: 8239
-...
-```
-Após apresentar os caracteres é mostrada a pmf , calculada a entropia e comprimento médio  
-```py
-# Ordenar a PMF em ordem decrescente
-sorted_pmf = sorted(pmf.items(), key=lambda item: item[1], reverse=True)
+# Contar caracteres e calcular PMF
+contador, pmf, texto_original = contar_caracteres('alice.txt')
 
 # Criar código de Huffman
-probs = [prob for _, prob in sorted_pmf]
+huffman, codigos = criar_codigo_huffman(pmf)
 
-
-
-print("\nPMF:")
-for char, prob in sorted_pmf:
-    print(f'{char}: {prob:.6f}')
-    
-huffman = komm.HuffmanCode(probs)
-
-dms = komm.DiscreteMemorylessSource(probs)
-print("A entropia da distribuição de frequências dos caracteres do livro:", dms.entropy())
-print("Comprimento médio do código de Huffman obtido:", huffman.rate(probs))
+# Calcular entropia e comprimento médio
+dms = komm.DiscreteMemorylessSource(list(pmf.values()))
+print("Entropia:", dms.entropy())
+print("Comprimento médio:", huffman.rate(list(pmf.values())))
 ```
-temos como saida:
-```sh
 
-PMF:
- : 0.166352
-e: 0.091519
-t: 0.069862
-a: 0.055640
-o: 0.054519
-...
-A entropia da distribuição de frequências dos caracteres do livro: 4.620542049477668
-Comprimento médio do código de Huffman obtido: 4.661185321249611
-```
-Assim é obtido que a entropia obtida pelo livro é de aproximadamente 4.62 e o comprimento médio do código de huffman obtido é de 4.66
+#pagebreak()
 == Tamanho (em bytes) e a taxa de compressão do arquivo comprimido
+O arquivo original possui 154,573 bytes. Após a compressão, o tamanho do arquivo foi reduzido para 86,278 bytes, resultando em uma taxa de compressão de 44.18%.
+
+A tabela abaixo compara o tamanho do arquivo original com o tamanho do arquivo comprimido:
+#align(center)[
+#table(
+columns: (auto, auto, auto),
+table.header(
+[Formato], [Tamanho (bytes)], [Taxa de Compressão]
+),
+[Original], [154,573], [0.00%],
+[Huffman], [86,278], [44.18%],
+)]
 
 #pagebreak()
 = Conclusão
+
+Este relatório demonstrou a eficácia dos códigos de Huffman na compressão de dados. Na primeira parte, foram realizados cálculos teóricos de entropia e construção de códigos de Huffman para uma fonte simples e sua extensão de segunda ordem. Na segunda parte, foi implementado um programa para compressão e descompressão de arquivos de texto, aplicado ao livro Alice’s Adventures in Wonderland. Os resultados mostraram uma taxa de compressão de 44.18%, evidenciando a utilidade dos códigos de Huffman em aplicações práticas.
